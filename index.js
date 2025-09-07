@@ -1,0 +1,97 @@
+import bcrypt from "bcryptjs";
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors"; // ✅ missing import
+import connectDB from "./DB/ConnectDB.js";
+import { MODULES } from "./config/module.js";
+
+import mainRoutes from "./routes/mainRoutes.js";
+import http from "http";
+import { createAdmin } from "./controller/AdminController.js";
+import { Server } from "socket.io"; // ✅ move import to top
+import { ensureModules } from "./utils/autoCreateModule.js";
+import path from "path";
+
+dotenv.config();
+const app = express();
+
+// ✅ Middleware
+app.use(express.json());
+
+// ✅ Allowed origins
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:3000",
+];
+
+// ✅ CORS Middleware for Express
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true, // agar cookies/jwt bhejni ho to
+  })
+);
+
+// ✅ Connect DB
+connectDB();
+
+// ✅ Create HTTP server for Socket.IO
+const server = http.createServer(app);
+
+// ✅ Correct Socket.IO initialization with same CORS rules
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  },
+});
+
+// ✅ Make io accessible in routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+// ✅ Socket.IO events
+io.on("connection", (socket) => {
+  console.log("🔌 Socket connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("❌ Socket disconnected:", socket.id);
+  });
+
+  socket.on("sendMessage", (data) => {
+    console.log("💬 Message received via socket:", data);
+    io.emit("newMessage", data);
+  });
+});
+
+// ✅ Sample route
+app.get("/", (req, res) => {
+  res.json({ success: true, message: "API is running" });
+});
+
+// ✅ Main routes
+app.use("/api", mainRoutes);
+const __dirname = path.resolve();
+
+// 🔹 Static folder expose karna
+app.use("/api/uploads", express.static(path.join(__dirname, "/uploads")));
+// ✅ Create super admin (enable if needed)
+createAdmin();
+ensureModules()
+
+
+// ✅ Start server
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
