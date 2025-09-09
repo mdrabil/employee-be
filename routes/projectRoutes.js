@@ -5,14 +5,17 @@ import {
   getProjectById,
   updateProject,
   deleteProject,
+  getProjectsByEmployeeId,
 } from "../controller/ProjectControll.js";
+import { authMiddleware } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.post("/", createProject);
-router.get("/", getProjects);
+router.post("/",authMiddleware, createProject);
+router.get("/",authMiddleware, getProjects);
 router.get("/:id", getProjectById);
-router.put("/:id", updateProject);
+router.get("/employee/:id", getProjectsByEmployeeId);
+router.put("/:id",authMiddleware, updateProject);
 router.delete("/:id", deleteProject);
 
 export default router;

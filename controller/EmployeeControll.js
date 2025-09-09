@@ -2,7 +2,7 @@
 
 
 import bcrypt from "bcryptjs";
-import { generateEmployeeId } from "../utils/generateEmployeeId.js";
+import { generateEmployeeId, generateRandomPassword } from "../utils/generateEmployeeId.js";
 
 // 🔹 Create Employee
 import mongoose from "mongoose";
@@ -10,6 +10,7 @@ import EmployeeModel from "../models/EmployeeModel.js";
 import Role from "../models/Role.js";
 import Department from "../models/Department.js";
 import Project from "../models/Project.js";
+import { sendMail } from "../utils/nodeMailer.js";
 
 
 export const createEmployee = async (req, res) => {
@@ -48,12 +49,15 @@ console.log('file aya ya nhi',empId)
       return res.status(400).json({ message: "Invalid Department ID" });
     }
     const deptExist = await Department.findById(department);
-    if (!deptExist || !req.file) {
+    if (!deptExist) {
       return res.status(400).json({ message: "Department not found" });
     }
 
+        const plainPassword = generateRandomPassword();
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
     // ✅ Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // const hashedPassword = await bcrypt.hash(password, 10);
 
     
        // 🔹 Image path set karo
@@ -76,6 +80,18 @@ const employee = await EmployeeModel.create({
   joiningDate,
 });
 
+  const subject = "Welcome to Company - Your Login Credentials";
+    const html = `
+      <h2>Welcome ${firstName}!</h2>
+      <p>Your employee account has been created successfully.</p>
+      <p><strong>Employee ID:</strong> ${empId}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Password:</strong> ${plainPassword}</p>
+      <br/>
+      <p>Please login and change your password after first login.</p>
+      <p>Regards,<br/>HR Team</p>
+    `;
+    await sendMail(email, subject, html);
     res.status(201).json({ message: "Employee created", employee });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -175,6 +191,34 @@ export const getEmployees = async (req, res) => {
   }
 };
 
+export const getSafeEmployees = async (req, res) => {
+  try {
+    // Agar user login hai (req.user.id exist karta hai)
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // Sare employees fetch karo (role, department populate hoga schema hook se)
+    const employees = await EmployeeModel.find();
+
+    // Sensitive fields hatao
+    const safeEmployees = employees.map((emp) => {
+      const empObj = emp.toObject();
+
+      delete empObj.bankDetails;
+      delete empObj.emergencyContact;
+      delete empObj.documents;
+      delete empObj.salary;
+      delete empObj.password; // extra safe 🚨
+
+      return empObj;
+    });
+console.log('safe ',safeEmployees)
+    res.json({ success: true, data: safeEmployees });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 
 

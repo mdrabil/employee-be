@@ -119,12 +119,47 @@ export const createProject = async (req, res) => {
 // Get All Projects
 export const getProjects = async (req, res) => {
   try {
-    const projects = await Project.find();
+    let projects;
+
+    if (req.user.role?.name === "admin") {
+      // ✅ Admin => sabhi projects
+      projects = await Project.find();
+    } else {
+      // ✅ Non-admin => sirf jisme lead array me userId ho
+      projects = await Project.find({ lead: req.user.id });
+    }
+
     res.json({ success: true, data: projects });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const getProjectsByEmployeeId = async (req, res) => {
+    const employeeId = req?.params?.id; // yeh string type hai (custom employeeId)
+
+  try {
+    // 🔹 Step 1: Employee model me check karo
+    const employee = await EmployeeModel.findOne({ employeeId }); // <-- yaha tumhara custom field
+
+    if (!employee) {
+      return res.status(404).json({ success: false, message: "Employee not found" });
+    }
+    // 🔹 Step 2: Ab _id se project find karo
+    const projects = await Project.find({
+      $or: [
+        { lead: employee._id },
+        { employees: employee._id }
+      ]
+    });
+
+    res.json({ success: true, data: projects });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
 
 // Get Single Project
 export const getProjectById = async (req, res) => {
@@ -138,17 +173,92 @@ export const getProjectById = async (req, res) => {
 };
 
 // Update Project
+// export const updateProject = async (req, res) => {
+//   try {
+//     const project = await Project.findById(req.params.id);
+//     if (!project)
+//       return res.status(404).json({ success: false, message: "Project not found" });
+
+//     // 🔹 Authorization check
+//     const userId = req.user.id; // assume req.user is populated
+//     const userRole = req.user.role?.name;
+
+//     if (userRole !== "admin" && !project.lead?.includes(userId)) {
+//       return res.status(403).json({ success: false, message: "You are not authorized to update this project" });
+//     }
+
+//     const { name, client, startDate, deadline, employees, status, priority, tasks, description, progress } = req.body;
+
+//     // ✅ Validation
+//     if (name) {
+//       const existing = await Project.findOne({ name, _id: { $ne: req.params.id } });
+//       if (existing) return res.status(400).json({ success: false, message: "Project name already exists" });
+//       project.name = name;
+//     }
+
+//     if (client) project.client = client;
+//     if (startDate) project.startDate = startDate;
+//     if (deadline) project.deadline = deadline;
+//     if (employees) project.employees = employees;
+//     if (status) project.status = status;
+//     if (priority) project.priority = priority;
+//     if (tasks) project.tasks = tasks;
+//     if (description) project.description = description;
+//     if (progress) project.progress = progress;
+
+//     await project.save();
+//     res.json({ success: true, data: project });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
 export const updateProject = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
-    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+    if (!project)
+      return res
+        .status(404)
+        .json({ success: false, message: "Project not found" });
 
-    const { name, client, startDate, deadline, employees, status, priority, tasks, description } = req.body;
+    // 🔹 Authorization check
+    const userId = req.user.id; // assume req.user is populated
+    const userRole = req.user.role?.name;
+    console.log('project',project)
+    console.log('userid',userId)
+if (
+  userRole !== "admin" &&
+  !project.lead?.some((lead) => lead._id.toString() === userId.toString())
+) {
+  return res.status(403).json({
+    success: false,
+    message: "You are not authorized to update this project",
+  });
+}
 
-    // ✅ Validation
+    const {
+      name,
+      client,
+      startDate,
+      deadline,
+      employees,
+      status,
+      priority,
+      tasks,
+      description,
+      progress,
+    } = req.body;
+
+    // ✅ Validation for name
     if (name) {
-      const existing = await Project.findOne({ name, _id: { $ne: req.params.id } });
-      if (existing) return res.status(400).json({ success: false, message: "Project name already exists" });
+      const existing = await Project.findOne({
+        name,
+        _id: { $ne: req.params.id },
+      });
+      if (existing)
+        return res
+          .status(400)
+          .json({ success: false, message: "Project name already exists" });
       project.name = name;
     }
 
@@ -156,17 +266,43 @@ export const updateProject = async (req, res) => {
     if (startDate) project.startDate = startDate;
     if (deadline) project.deadline = deadline;
     if (employees) project.employees = employees;
-    if (status) project.status = status;
+    // if (status) project.status = status;
+if (status) {
+  if (status === "completed") {
+    project.status = "completed";
+    project.progress = 100;
+  } else {
+    // agar pehle se 100 tha aur status change ho gaya
+    if (project.progress === 100) {
+      project.progress = 99;
+    }
+    project.status = status;
+  }
+}
     if (priority) project.priority = priority;
     if (tasks) project.tasks = tasks;
     if (description) project.description = description;
 
+if (progress !== undefined) {
+  project.progress = progress;
+
+  if (progress === 100) {
+    project.status = "completed";
+  }
+}
+      // 🔹 Auto complete condition
+
+
     await project.save();
     res.json({ success: true, data: project });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res
+      .status(500)
+      .json({ success: false, message: error.message });
   }
 };
+
+
 
 // Delete Project
 export const deleteProject = async (req, res) => {

@@ -1,58 +1,57 @@
+
+
+
+
+
+
+
 // import mongoose from "mongoose";
+// import { formatDateTime, formatHours } from "../utils/TimeMinHelper.js";
 
-// const { Schema, model } = mongoose;
-
-// const attendanceSchema = new Schema(
-//   {
-//     // employee: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", required: true },
-//     employee: { type: String, required: true },
-//     date: { type: Date, required: true },
-//     dutyStart: { type: String, default: "09:15" },
-//     dutyEnd: { type: String, default: "18:30" },
-//     checkIn: { type: Date },
-//     checkOut: { type: Date },
-//     totalHours: { type: Number, default: 0 },
-//     extraHours: { type: Number, default: 0 },
-//     lateByMinutes: { type: Number, default: 0 },
-//     status: { type: String, enum: ["present", "half-day", "absent"], default: "present" },
-//   },
-//   { timestamps: true }
-// );
-
-// // 🔹 Auto populate employee details (role, department, customPermissions)
-// function autoPopulateEmployee(next) {
-//   this.populate({
-//     path: "employee",
-//     select: "firstName lastName email role customPermissions department",
-//     populate: [
-//       {
-//         path: "role",
-//         populate: { path: "permissions.module", model: "Module", select: "name" }
-//       },
-//       {
-//         path: "customPermissions",
-//         populate: { path: "permissions.module", model: "Module", select: "name" }
-//       },
-//       {
-//         path: "department",
-//         select: "name description"
-//       }
-//     ]
-//   });
-//   next();
-// }
-
-// // 🔹 Apply hooks
-// ["find", "findOne", "findById"].forEach(hook => attendanceSchema.pre(hook, autoPopulateEmployee));
-
-// export default model("Attendance", attendanceSchema);
+// const attendanceSchema = new mongoose.Schema({
+//   employeeId: { type: String, required: true, index: true },
+//   employeeID: { type: mongoose.Schema.Types.ObjectId, ref: "Employee" },
+//   checkIn: Date,
+//   checkOut: Date,
+//   breaks: [{ start: Date, end: Date }],
+//   totalHours: { type: Number, default: 0 },         // stored in hours (decimal)
+//   totalBreakTime: { type: Number, default: 0 },  // stored in minutes
+//   attendanceStatus: { type: String, default: "Present" },
+//   extraHours: { type: Number, default: 0 },
+//   currentStatus: { type: String, default: "Not Started" }
+// }, { timestamps: true });
 
 
+// // Virtuals
+// attendanceSchema.virtual("totalHoursFormatted").get(function () {
+//   return formatHours(this.totalHours || 0);   // decimal hours → h min
+// });
+
+// attendanceSchema.virtual("totalBreakFormatted").get(function () {
+//   return formatHours(this.totalBreakTime || 0); // minutes → hours → h min
+// });
+
+// attendanceSchema.virtual("extraHoursFormatted").get(function () {
+//   return formatHours(this.extraHours || 0);
+// });
+
+// attendanceSchema.virtual("checkInFormatted").get(function () {
+//   return formatDateTime(this.checkIn);
+// });
+
+// attendanceSchema.virtual("checkOutFormatted").get(function () {
+//   return formatDateTime(this.checkOut);
+// });
+
+// // enable JSON virtuals
+// attendanceSchema.set("toJSON", { virtuals: true });
+// attendanceSchema.set("toObject", { virtuals: true });
+
+// export default mongoose.model("Attendance", attendanceSchema);
 
 
 import mongoose from "mongoose";
-
-// import mongoose from "mongoose";
+import { calculateSessionsDuration, formatDateTime, formatHours } from "../utils/TimeMinHelper.js";
 
 const attendanceSchema = new mongoose.Schema({
   employeeId: { type: String, required: true, index: true },
@@ -60,42 +59,57 @@ const attendanceSchema = new mongoose.Schema({
   checkIn: Date,
   checkOut: Date,
   breaks: [{ start: Date, end: Date }],
-  totalHours: { type: Number, default: 0 },         // in hours decimal
-  totalBreakMinutes: { type: Number, default: 0 },  // in minutes
-  attendanceStatus: { type: String, default: "Present" }, // Present / Half Day
-  extraHours: { type: Number, default: 0 },         // in hours decimal
-  currentStatus: { type: String, default: "Not Started" } // Working / On Break / Completed
+  lateBy: { type: String, default: "0h 0min" }, 
+  totalHours: { type: Number, default: 0 },
+  totalBreakTime: { type: Number, default: 0 },
+  attendanceStatus: { type: String, default: "Present" },
+  extraHours: { type: Number, default: 0 },
+  currentStatus: { type: String, default: "Not Started" }
 }, { timestamps: true });
 
 
-// 🔹 Helper to format hours
-function formatHours(hoursDecimal) {
-  const h = Math.floor(hoursDecimal);
-  const m = Math.round((hoursDecimal - h) * 60);
-  return `${h}h ${m}min`;
-}
-
-// 🔹 Virtual fields (not stored in DB, but appear in JSON)
+// 🔹 Virtuals
 attendanceSchema.virtual("totalHoursFormatted").get(function () {
-  return formatHours(this.totalHours || 0);
+  return formatHours(this.totalHours || 0);   // decimal hours → h min
 });
 
 attendanceSchema.virtual("totalBreakFormatted").get(function () {
-  return formatHours((this.totalBreakMinutes || 0) / 60);
+  return calculateSessionsDuration(this.breaks || []); // minutes → h min
 });
 
 attendanceSchema.virtual("extraHoursFormatted").get(function () {
   return formatHours(this.extraHours || 0);
 });
 
-// ensure virtuals show up in JSON
+attendanceSchema.virtual("checkInFormatted").get(function () {
+  return formatDateTime(this.checkIn);
+});
+
+attendanceSchema.virtual("checkOutFormatted").get(function () {
+  return formatDateTime(this.checkOut);
+});
+
+
+// 🔹 Pre-save hook → calculate total break time
+attendanceSchema.pre("save", function (next) {
+  if (this.breaks && this.breaks.length > 0) {
+    let totalMinutes = 0;
+
+    this.breaks.forEach(b => {
+      if (b.start && b.end) {
+        const diff = (new Date(b.end) - new Date(b.start)) / (1000 * 60); // minutes
+        totalMinutes += diff;
+      }
+    });
+
+    this.totalBreakTime = Math.round(totalMinutes); // store in minutes
+  }
+  next();
+});
+
+
+// enable JSON virtuals
 attendanceSchema.set("toJSON", { virtuals: true });
 attendanceSchema.set("toObject", { virtuals: true });
 
 export default mongoose.model("Attendance", attendanceSchema);
-
-
-// export default mongoose.model("Attendance", attendanceSchema);
-
-
-// export default mongoose.model("Attendance", attendanceSchema);

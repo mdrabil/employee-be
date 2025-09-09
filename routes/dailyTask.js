@@ -12,7 +12,7 @@ router.get("/summary/:id", ctrl.getTaskSummary);
 router.get("/:id",  ctrl.getDailyTaskById);
 
 // Admin routes
-router.get("/",ctrl.getAllDailyTasks);
+router.get("/",authMiddleware, ctrl.getAllDailyTasks);
 router.get("/today", ctrl.getTodayTasks);
 router.delete("/:id",  ctrl.deleteDailyTask);
 
