@@ -117,7 +117,11 @@ export const punchIn = async (req, res) => {
       currentStatus: "Working",
       lateBy, // new field
     });
-
+  req.io.emit("attendanceUpdate", {
+      type: "punchIn",
+      employee: employee?.firstName,
+      data: attendance,
+    });
     res.json({ success: true, attendance });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -147,6 +151,13 @@ export const startBreak = async (req, res) => {
     attendance.breaks.push({ start: new Date() });
     attendance.currentStatus = "On Break";
     await attendance.save();
+
+    req.io.emit("attendanceUpdate", {
+  type: "startBreak",
+  employee: attendance.employeeID?.firstName,
+  data: attendance,
+});
+
 
     res.json({ success: true, attendance });
   } catch (err) {
@@ -182,6 +193,13 @@ export const endBreak = async (req, res) => {
     lastBreak.end = new Date();
     attendance.currentStatus = "Working";
     await attendance.save();
+
+    req.io.emit("attendanceUpdate", {
+  type: "endBreak",
+  employee: attendance.employeeID?.firstName,
+  data: attendance,
+});
+
 
     res.json({ success: true, attendance });
   } catch (err) {
@@ -244,6 +262,14 @@ export const punchOut = async (req, res) => {
   
 
     await attendance.save();
+
+
+    req.io.emit("attendanceUpdate", {
+  type: "punchOut",
+  employee: attendance.employeeID?.firstName,
+  data: attendance,
+});
+
     res.json({ success: true, attendance });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -282,7 +308,37 @@ export const getAllAttendance = async (req, res) => {
     const attendance = await Attendance.find({ createdAt: { $gte: today } })
       .populate("employeeID", "name employeeNo role profileImage");
 
-    res.json({ success: true, attendance });
+
+    let totalPresent = 0;
+    let totalAbsent = 0;
+    let totalLate = 0;
+
+    attendance.forEach((rec) => {
+      // Present count (Present + Half Day)
+      if (rec.attendanceStatus === "Present" || rec.attendanceStatus === "Half Day") {
+        totalPresent++;
+      }
+      // Absent count
+      if (rec.attendanceStatus === "Absent") {
+        totalAbsent++;
+      }
+      // Late count (if lateBy not "0h 0min" or "0m")
+      if (rec.lateBy && rec.lateBy !== "0h 0min" && rec.lateBy !== "0m") {
+        totalLate++;
+      }
+    });
+
+    res.json({
+      success: true,
+     attendance,
+      stats: {
+        totalPresent,
+        totalAbsent,
+        totalLate,
+      },
+    });
+
+    // res.json({ success: true, attendance });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: "Server Error" });
@@ -292,17 +348,58 @@ export const getAllAttendance = async (req, res) => {
 // =============================
 // Get Overall Attendance (All Employees)
 // =============================
+// export const getOverallAttendance = async (req, res) => {
+//   try {
+//     const attendanceRecords = await Attendance.find({})
+//       .populate("employeeID", "name employeeNo role profileImage firstName lastName");
+
+//     res.json({ success: true, records: attendanceRecords });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ success: false, message: "Server Error" });
+//   }
+// };
+
 export const getOverallAttendance = async (req, res) => {
   try {
     const attendanceRecords = await Attendance.find({})
-      .populate("employeeID", "name employeeNo role profileImage firstName lastName");
+      .populate("employeeID", "firstName lastName employeeNo role profileImage");
 
-    res.json({ success: true, records: attendanceRecords });
+    // ✅ Stats calculate
+    let totalPresent = 0;
+    let totalAbsent = 0;
+    let totalLate = 0;
+
+    attendanceRecords.forEach((rec) => {
+      // Present count (Present + Half Day)
+      if (rec.attendanceStatus === "Present" || rec.attendanceStatus === "Half Day") {
+        totalPresent++;
+      }
+      // Absent count
+      if (rec.attendanceStatus === "Absent") {
+        totalAbsent++;
+      }
+      // Late count (if lateBy not "0h 0min" or "0m")
+      if (rec.lateBy && rec.lateBy !== "0h 0min" && rec.lateBy !== "0m") {
+        totalLate++;
+      }
+    });
+
+    res.json({
+      success: true,
+      records: attendanceRecords,
+      stats: {
+        totalPresent,
+        totalAbsent,
+        totalLate,
+      },
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching attendance:", error);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
+
 
 
 // export const getEmployeeOverallAttendance = async (req, res) => {

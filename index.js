@@ -62,9 +62,18 @@ app.use((req, res, next) => {
   next();
 });
 
+// server.js
+
+
+
 // ✅ Socket.IO events
 io.on("connection", (socket) => {
   console.log("🔌 Socket connected:", socket.id);
+
+    socket.on("user_connected", (userId) => {
+    socket.join(userId); // ✅ unique room
+    console.log("User connected:", userId);
+  });
 
   socket.on("disconnect", () => {
     console.log("❌ Socket disconnected:", socket.id);

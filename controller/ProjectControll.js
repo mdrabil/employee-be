@@ -39,6 +39,7 @@ import EmployeeModel from "../models/EmployeeModel.js";
 
 
 // Create Project
+
 export const createProject = async (req, res) => {
   try {
     const {
@@ -52,23 +53,37 @@ export const createProject = async (req, res) => {
       lead,      // array of _id
     } = req.body;
 
-
+    console.log('titile',title)
+    // 🔹 Agar files aaye hai to extract karo warna empty array
+    const files = req?.files?.length > 0 
+      ? req.files.map((f) => f.filename)
+      : [];
+  // 🔹 Duplicate project title check
   const existingProject = await Project.findOne({ name: title });
-    if (existingProject) {
-      return res.status(400).json({
-        success: false,
-        message: `Project with title "${title}" already exists`,
-      });
-    }
- // 🔹 Combine IDs
-    const allEmployeeIds = [...employees, ...lead].map(id => new mongoose.Types.ObjectId(id));
+  if (existingProject) {
+    return res.status(400).json({
+      success: false,
+      message: `Project with title "${title}" already exists`,
+    });
+  }
 
-    // 🔹 Get valid employees from DB
-    const validEmployees = await EmployeeModel.find({ _id: { $in: allEmployeeIds } }).select("_id");
-    const validIds = validEmployees.map(emp => emp._id.toString());
+  // ✅ Optional employees + lead IDs (sirf valid rakho)
+  const allEmployeeIds = [...employees, ...lead]
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
 
-    // 🔹 Check if all IDs exist
-    const isAllExist = allEmployeeIds.every(id => validIds.includes(id.toString()));
+  // Agar empty hai, skip validation
+  let validIds = [];
+  if (allEmployeeIds.length > 0) {
+    const validEmployees = await EmployeeModel.find({
+      _id: { $in: allEmployeeIds },
+    }).select("_id");
+
+    validIds = validEmployees.map((emp) => emp._id.toString());
+
+    const isAllExist = allEmployeeIds.every((id) =>
+      validIds.includes(id.toString())
+    );
 
     if (!isAllExist) {
       return res.status(400).json({
@@ -76,18 +91,12 @@ export const createProject = async (req, res) => {
         message: "Some employee IDs are invalid",
       });
     }
+  }
 
-    // 🔹 Check dates
-    const now = new Date();
+
+    // 🔹 Date check
     const start = new Date(startDate);
     const end = new Date(deadline);
-
-    // if (start < now.setHours(0, 0, 0, 0)) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Start date cannot be in the past",
-    //   });
-    // }
 
     if (end < start) {
       return res.status(400).json({
@@ -96,6 +105,7 @@ export const createProject = async (req, res) => {
       });
     }
 
+    // 🔹 Project create
     const project = new Project({
       name: title,
       description,
@@ -103,8 +113,9 @@ export const createProject = async (req, res) => {
       startDate: start,
       deadline: end,
       priority,
-      employees, // store _id array directly
-      lead,      // store _id array directly
+      employees,
+      lead,
+      files, // optional: agar hai to add ho jayega
     });
 
     await project.save();
@@ -114,6 +125,7 @@ export const createProject = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 
 // Get All Projects

@@ -15,7 +15,7 @@ import { sendMail } from "../utils/nodeMailer.js";
 
 export const createEmployee = async (req, res) => {
   try {
-    const { firstName, email, role, department } = req.body;
+    const { firstName, email, role, department,lastName } = req.body;
     const salary = req.body.salary ? JSON.parse(req.body?.salary) : null;
 const bankDetails = req.body?.bankDetails ? JSON?.parse(req.body?.bankDetails) : {};
 const emergencyContact = req.body?.emergencyContact ? JSON?.parse(req.body?.emergencyContact) : {};
@@ -80,19 +80,51 @@ const employee = await EmployeeModel.create({
   joiningDate,
 });
 
-  const subject = "Welcome to Company - Your Login Credentials";
-    const html = `
-      <h2>Welcome ${firstName}!</h2>
-      <p>Your employee account has been created successfully.</p>
-      <p><strong>Employee ID:</strong> ${empId}</p>
-      <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Password:</strong> ${plainPassword}</p>
-      <br/>
-      <p>Please login and change your password after first login.</p>
-      <p>Regards,<br/>HR Team</p>
-    `;
-    await sendMail(email, subject, html);
-    res.status(201).json({ message: "Employee created", employee });
+// https://crm.arawebtechnologies.com/login 
+
+//   const subject = "Welcome to Company - Your Login Credentials";
+//     const html = `
+//       <h2>Welcome ${firstName}!</h2>
+//       <p>Your employee account has been created successfully.</p>
+//       <p><strong>Employee ID:</strong> ${empId}</p>
+//       <p><strong>Email:</strong> ${email}</p>
+//       <p><strong>Password:</strong> ${plainPassword}</p>
+//       <br/>
+//       <p>Please login and change your password after first login.</p>
+//       <p>Regards,<br/>HR Team</p>
+//     `;
+//     await sendMail(email, subject, html);
+//     res.status(201).json({ message: "Employee created", employee });
+
+const subject = "Welcome to Company - Your Login Credentials";
+const html = `
+  <h2>Welcome ${firstName} ${lastName}!</h2>
+  <p>Your employee account has been created successfully.</p>
+  <p><strong>Employee ID:</strong> ${empId}</p>
+  <p><strong>Email:</strong> ${email}</p>
+  <p><strong>Password:</strong> ${plainPassword}</p>
+  <br/>
+  <p>Please login and change your password after first login.</p>
+  <p>
+    <a href="https://crm.arawebtechnologies.com/login" 
+       style="display:inline-block;
+              margin-top:10px;
+              padding:10px 20px;
+              background-color:#f97316;
+              color:#fff;
+              text-decoration:none;
+              border-radius:5px;
+              font-weight:bold;">
+      Login to Portal
+    </a>
+  </p>
+  <br/>
+  <p>Regards,<br/>HR Team</p>
+`;
+
+await sendMail(email, subject, html);
+res.status(201).json({ message: "Employee created", employee });
+
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

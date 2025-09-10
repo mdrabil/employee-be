@@ -14,6 +14,7 @@ const meetingSchema = new Schema({
 // 🔹 Task Schema
 const taskSubSchema = new Schema({
   project: { type: mongoose.Schema.Types.ObjectId, ref: "Project" },
+  assignByUser: { type: mongoose.Schema.Types.ObjectId, ref: "Employee" },
   title: { type: String, required: true },
   Ptitle: { type: String},
   description: { type: String },

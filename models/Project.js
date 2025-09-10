@@ -46,6 +46,7 @@ const projectSchema = new Schema(
       enum: ["not started", "in-progress", "completed", "on hold", "cancelled","continue"],
       default: "not started",
     },
+files: [{ type: String }],
 
     priority: {
       type: String,

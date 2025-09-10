@@ -8,10 +8,14 @@ import {
   getProjectsByEmployeeId,
 } from "../controller/ProjectControll.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { upload } from "../utils/multerConfig.js";
 
 const router = express.Router();
 
-router.post("/",authMiddleware, createProject);
+router.post("/",authMiddleware,
+   upload.array("files", 10), // max 10 files
+
+    createProject);
 router.get("/",authMiddleware, getProjects);
 router.get("/:id", getProjectById);
 router.get("/employee/:id", getProjectsByEmployeeId);

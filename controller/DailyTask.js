@@ -91,7 +91,15 @@ export const addTaskForToday = async (req, res) => {
   try {
     // const employeeId = req.user?.id || req.user?.employeeId;
 
-      const employeeId = req.body.assignedTo || req.user?.id || req.user?.employeeId;
+    let employeeId = req.user?.id || req.user?.employeeId;
+let employeeIdAssigner = undefined;
+
+if (req.body.assignedTo) {
+  employeeId = req.body.assignedTo;
+  employeeIdAssigner = req.user?.id; // jisne assign kiya
+}
+
+      // const employeeId = req.body.assignedTo || req.user?.id || req.user?.employeeId;
 
     if (!employeeId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -106,6 +114,7 @@ export const addTaskForToday = async (req, res) => {
   project: body.project,
   title: body.title,
   Ptitle: body?.Ptitle || "Office Work",
+  assignByUser:employeeIdAssigner,
   description: body.description,
   startTime: body.startTime ? new Date(body.startTime) : undefined,
   endTime: body.endTime ? new Date(body.endTime) : undefined,
@@ -128,6 +137,12 @@ export const addTaskForToday = async (req, res) => {
 
     recalcSummary(doc);
     await doc.save();
+
+req.io.to(req.body.assignedTo || req.user?.id).emit("taskAssigned", {
+  message: "New Task Assigned",
+  task: task, // ya newTask
+});
+
     res.status(201).json({ success: true, data: doc });
   } catch (err) {
     console.error(err);
