@@ -15,5 +15,7 @@ router.get("/:id",  ctrl.getDailyTaskById);
 router.get("/",authMiddleware, ctrl.getAllDailyTasks);
 router.get("/today", ctrl.getTodayTasks);
 router.delete("/:id",  ctrl.deleteDailyTask);
+router.patch("/:dailyTaskId/tasks/:taskId", authMiddleware, ctrl.editTask);
+
 
 export default router;

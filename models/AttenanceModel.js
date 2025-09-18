@@ -107,6 +107,53 @@ attendanceSchema.pre("save", function (next) {
   next();
 });
 
+attendanceSchema.statics.autoPunchOutToday = async function () {
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const pendingAttendances = await this.find({
+      checkIn: { $gte: todayStart },
+      checkOut: null,
+    });
+
+    for (let attendance of pendingAttendances) {
+      // Auto punch-out time 6:30 PM
+      const autoCheckOut = new Date();
+      autoCheckOut.setHours(18, 30, 0, 0); // 6:30 PM
+
+      // Work Minutes
+      const workMinutes = (autoCheckOut - attendance.checkIn) / (1000 * 60);
+
+      // Break Minutes
+      let breakMinutes = 0;
+      attendance.breaks.forEach(b => {
+        if (b.start && b.end) breakMinutes += (b.end - b.start) / (1000 * 60);
+      });
+
+      const netMinutes = workMinutes - breakMinutes;
+      const netHours = netMinutes / 60;
+
+      attendance.checkOut = autoCheckOut;
+      attendance.currentStatus = "Completed";
+      attendance.totalHours = parseFloat(netHours.toFixed(2));
+      attendance.totalBreakTime = Math.round(breakMinutes);
+
+      const requiredMinutes = 8 * 60;
+      let extraMinutes = 0;
+      if (netMinutes > requiredMinutes) extraMinutes = netMinutes - requiredMinutes;
+      attendance.extraHours = parseFloat((extraMinutes / 60).toFixed(2));
+
+      await attendance.save();
+    }
+
+    console.log("Auto punch-out applied for today");
+  } catch (err) {
+    console.error("Error in auto punch-out:", err.message);
+  }
+};
+
+
 
 // enable JSON virtuals
 attendanceSchema.set("toJSON", { virtuals: true });

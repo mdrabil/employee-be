@@ -332,3 +332,49 @@ export const deleteDailyTask = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+
+
+export const editTask = async (req, res) => {
+  try {
+    const { dailyTaskId, taskId } = req.params;
+    const updates = req.body; // { title, description, startTime, endTime, status, priority, ... }
+
+    // 🔹 Find the daily task
+    const dailyTask = await DailyTask.findById(dailyTaskId);
+    if (!dailyTask) {
+      return res.status(404).json({ success: false, message: "DailyTask not found" });
+    }
+
+    // 🔹 Find the task inside dailyTask
+    const task = dailyTask.tasks.id(taskId);
+    if (!task) {
+      return res.status(404).json({ success: false, message: "Task not found" });
+    }
+
+    // 🔹 Update allowed fields
+    const allowedFields = [
+      "title",
+      "Ptitle",
+      "description",
+      "meetings",
+  
+    ];
+
+    allowedFields.forEach(field => {
+      if (updates[field] !== undefined) {
+        task[field] = updates[field];
+      }
+    });
+
+    // 🔹 Optional: Recalculate totalHours or progressSessions if needed
+    if (updates.durationHours) task.durationHours = updates.durationHours;
+
+    await dailyTask.save();
+
+    res.json({ success: true, message: "Task updated successfully", dailyTask });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

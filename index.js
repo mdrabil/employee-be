@@ -11,6 +11,8 @@ import { createAdmin } from "./controller/AdminController.js";
 import { Server } from "socket.io"; // ✅ move import to top
 import { ensureModules } from "./utils/autoCreateModule.js";
 import path from "path";
+import cron from "node-cron";
+import AttenanceModel from "./models/AttenanceModel.js";
 
 dotenv.config();
 const app = express();
@@ -41,6 +43,10 @@ app.use(
   })
 );
 
+
+cron.schedule("30 22 * * *", async () => {
+  await AttenanceModel.autoPunchOutToday();
+});
 // ✅ Connect DB
 connectDB();
 

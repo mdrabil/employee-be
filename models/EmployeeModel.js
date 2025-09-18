@@ -138,9 +138,7 @@ const employeeSchema = new Schema(
     // 🔹 Salary & Payroll
     salary: {
       base: { type: Number, }, // Basic Salary
-      hra: { type: Number, default: 0 }, // House Rent Allowance
-      bonus: { type: Number, default: 0 },
-      deductions: { type: Number, default: 0 },
+
       currency: { type: String, default: "INR" },
     },
     bankDetails: {
