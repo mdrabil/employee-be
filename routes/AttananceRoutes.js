@@ -29,7 +29,7 @@
 
 
 import express from "express";
-import { endBreak, getAllAttendance, getEmployeeOverallAttendance, getOverallAttendance, getTodayAttendance, punchIn, punchOut, startBreak } from "../controller/AttananceControll.js";
+import { endBreak, getAllAttendance, getEmployeeOverallAttendance, getOverallAttendance, getTodayAttendance, punchIn, punchOut, startBreak, updateTodayAttendance } from "../controller/AttananceControll.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -45,5 +45,6 @@ router.get("/overall",authMiddleware, getOverallAttendance);
 
 
 router.get("/:employeeId/today", getTodayAttendance);
+router.put("/:employeeId/today/status", updateTodayAttendance);
 
 export default router;

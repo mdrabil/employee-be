@@ -3,6 +3,7 @@
 import Attendance from '../models/AttenanceModel.js'
 import EmployeeModel from '../models/EmployeeModel.js';
 import { formatHours } from '../utils/TimeMinHelper.js';
+import moment from "moment";
 
 
 
@@ -297,6 +298,38 @@ export const getTodayAttendance = async (req, res) => {
   }
 };
 
+
+export const updateTodayAttendance = async (req, res) => {
+  try {
+    const empNo  = req.params?.employeeId;   // frontend se empNo aa raha hai
+    const { checkOut } = req.body;
+    console.log("emploiye",empNo)
+
+    // Today ka start time
+    const todayStart = moment().startOf("day").toDate();
+
+    // Attendance record find karo
+    const attendance = await Attendance.findOneAndUpdate(
+      {
+        employeeId: empNo,
+        createdAt: { $gte: todayStart }, // aaj ka record hi update hoga
+      },
+      { $set: { checkOut: checkOut } }, // checkOut ko null set karo
+      { new: true }
+    );
+
+    if (!attendance) {
+      return res.status(404).json({ success: false, message: "Attendance not found" });
+    }
+
+    res.json({ success: true, data: attendance });
+  } catch (err) {
+    console.error("Error updating attendance:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
 // =============================
 // Get All Employees Attendance (Today)
 // =============================
@@ -476,3 +509,5 @@ export const getEmployeeOverallAttendance = async (req, res) => {
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
+
+

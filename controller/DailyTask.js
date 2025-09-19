@@ -3,6 +3,8 @@
 
 
 import DailyTask from "../models/DailyTask.js";
+import cron from "node-cron";
+import EmployeeModel from "../models/EmployeeModel.js";
 
 /* ---------- Helper: normalize date to start of day ---------- */
 const normalizeDate = (d) => {
@@ -87,50 +89,109 @@ export const getDailyTaskById = async (req, res) => {
 
 
 /* ---------- Employee: Add a task for today (or specific date) ---------- */
+// export const addTaskForToday = async (req, res) => {
+//   try {
+//     // const employeeId = req.user?.id || req.user?.employeeId;
+
+//     let employeeId = req.user?.id || req.user?.employeeId;
+// let employeeIdAssigner = undefined;
+
+// if (req.body.assignedTo) {
+//   employeeId = req.body.assignedTo;
+//   employeeIdAssigner = req.user?.id; // jisne assign kiya
+// }
+
+//       // const employeeId = req.body.assignedTo || req.user?.id || req.user?.employeeId;
+
+//     if (!employeeId) {
+//       return res.status(401).json({ success: false, message: "Unauthorized" });
+//     }
+    
+//     const body = req.body;
+
+//  const task = {
+//   project: body.project,
+//   title: body.title,
+//   Ptitle: body?.Ptitle || "Office Work",
+//   assignByUser:employeeIdAssigner,
+//   description: body.description,
+//   startTime: body.startTime ? new Date(body.startTime) : undefined,
+//   endTime: body.endTime ? new Date(body.endTime) : undefined,
+//   priority: body.priority || "medium",
+//   messages: body.messages || "",
+// };
+
+//     const dateToUse = normalizeDate(body.date);
+
+//     let doc = await DailyTask.findOne({
+//       employee: employeeId,
+//       date: dateToUse
+//     });
+
+//     if (!doc) {
+//       doc = new DailyTask({ employee: employeeId, date: dateToUse, tasks: [task] });
+//     } else {
+//       doc.tasks.push(task);
+//     }
+
+//     recalcSummary(doc);
+//     await doc.save();
+
+// req.io.to(req.body.assignedTo || req.user?.id).emit("taskAssigned", {
+//   message: "New Task Assigned",
+//   task: task, // ya newTask
+// });
+
+//     res.status(201).json({ success: true, data: doc });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(400).json({ success: false, message: err.message });
+//   }
+// };
+
+
 export const addTaskForToday = async (req, res) => {
   try {
-    // const employeeId = req.user?.id || req.user?.employeeId;
-
+    const loggedInUserId = req.user?.id; // jo login hai
     let employeeId = req.user?.id || req.user?.employeeId;
-let employeeIdAssigner = undefined;
+    let employeeIdAssigner = undefined;
 
-if (req.body.assignedTo) {
-  employeeId = req.body.assignedTo;
-  employeeIdAssigner = req.user?.id; // jisne assign kiya
-}
-
-      // const employeeId = req.body.assignedTo || req.user?.id || req.user?.employeeId;
+    if (req.body.assignedTo) {
+      employeeId = req.body.assignedTo; // jisko assign kiya
+      employeeIdAssigner = loggedInUserId; // kisne assign kiya
+    }
 
     if (!employeeId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
-    
-    // if (!employeeId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    
     const body = req.body;
 
- const task = {
-  project: body.project,
-  title: body.title,
-  Ptitle: body?.Ptitle || "Office Work",
-  assignByUser:employeeIdAssigner,
-  description: body.description,
-  startTime: body.startTime ? new Date(body.startTime) : undefined,
-  endTime: body.endTime ? new Date(body.endTime) : undefined,
-  priority: body.priority || "medium",
-  messages: body.messages || "",
-};
+    const task = {
+      project: body.project,
+      title: body.title,
+      Ptitle: body?.Ptitle || "Office Work",
+      assignByUser: employeeIdAssigner,
+      description: body.description,
+      startTime: body.startTime ? new Date(body.startTime) : undefined,
+      endTime: body.endTime ? new Date(body.endTime) : undefined,
+      priority: body.priority || "medium",
+      messages: body.messages || "",
+    };
 
     const dateToUse = normalizeDate(body.date);
 
     let doc = await DailyTask.findOne({
       employee: employeeId,
-      date: dateToUse
+      date: dateToUse,
     });
 
     if (!doc) {
-      doc = new DailyTask({ employee: employeeId, date: dateToUse, tasks: [task] });
+      doc = new DailyTask({
+        employee: employeeId,
+        date: dateToUse,
+        tasks: [task],
+      });
     } else {
       doc.tasks.push(task);
     }
@@ -138,10 +199,23 @@ if (req.body.assignedTo) {
     recalcSummary(doc);
     await doc.save();
 
-req.io.to(req.body.assignedTo || req.user?.id).emit("taskAssigned", {
-  message: "New Task Assigned",
-  task: task, // ya newTask
-});
+    // 🔹 Notification logic
+    if (loggedInUserId !== employeeId) {
+      // assigner ka detail nikalna (name, role)
+      const assignerUser = await EmployeeModel.findById(loggedInUserId).select(
+        "firstName lastName role"
+      );
+
+      req.io.to(employeeId.toString()).emit("taskAssigned", {
+        message: "New Task Assigned",
+        task,
+        assigner: {
+          id: assignerUser._id,
+          name: `${assignerUser.firstName} ${assignerUser.lastName}`,
+          role: assignerUser.role?.name,
+        },
+      });
+    }
 
     res.status(201).json({ success: true, data: doc });
   } catch (err) {
@@ -377,4 +451,32 @@ export const editTask = async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: err.message });
   }
+};
+
+
+
+export const setupTaskReminderCron = (io) => {
+  // Har ghante chalega
+  cron.schedule("0 * * * *", async () => {
+    try {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      // saare employees ke last task nikalna
+      const tasks = await DailyTask.find({ date: today }).populate("employee");
+
+      tasks.forEach((doc) => {
+        if (doc.tasks.length > 0) {
+          const lastTask = doc.tasks[doc.tasks.length - 1];
+
+          io.to(doc.employee._id.toString()).emit("taskReminder", {
+            message: "Reminder: Your last task",
+            task: lastTask,
+          });
+        }
+      });
+    } catch (err) {
+      console.error("Reminder Cron Error:", err);
+    }
+  });
 };

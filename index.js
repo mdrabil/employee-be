@@ -13,6 +13,7 @@ import { ensureModules } from "./utils/autoCreateModule.js";
 import path from "path";
 import cron from "node-cron";
 import AttenanceModel from "./models/AttenanceModel.js";
+import { setupTaskReminderCron } from "./controller/DailyTask.js";
 
 dotenv.config();
 const app = express();
@@ -61,6 +62,8 @@ const io = new Server(server, {
     credentials: true,
   },
 });
+
+setupTaskReminderCron(io);
 
 // ✅ Make io accessible in routes
 app.use((req, res, next) => {
