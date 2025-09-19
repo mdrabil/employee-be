@@ -377,6 +377,33 @@ export const updateTaskStatus = async (req, res) => {
   }
 };
 
+
+export const deleteTaskStatus = async (req, res) => {
+  try {
+    const { dailyTaskId, taskId } = req.params;
+
+    // Find by dailyTaskId and delete the task with taskId
+    const doc = await DailyTask.findByIdAndUpdate(
+      dailyTaskId,
+      { $pull: { tasks: { _id: taskId } } }, // remove task with matching _id
+      { new: true } // return updated document
+    );
+
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Daily task not found" });
+    }
+
+    // Optional: notify assigned employee via socke
+
+    res.status(200).json({ success: true, message: "Task deleted successfully", data: doc });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+
 /* ---------- Get summary for a DailyTask ---------- */
 export const getTaskSummary = async (req, res) => {
   try {
