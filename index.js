@@ -52,7 +52,7 @@ app.use(
 
 
 
-cron.schedule("01 18 * * *", async () => {
+cron.schedule("01 22 * * *", async () => {
   console.log("🚀 Running auto punch-out cron...");
   await AttenanceModel.autoPunchOutToday();
 }, {
