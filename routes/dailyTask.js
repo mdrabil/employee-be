@@ -7,7 +7,7 @@ const router = express.Router();
 // Employee routes (protected)
 router.post("/",authMiddleware, ctrl.addTaskForToday); // add task (push into today's)
 router.get("/my",authMiddleware, ctrl.getMyDailyTasks);
-router.patch("/:dailyTaskId/tasks/:taskId/status", ctrl.updateTaskStatus);
+router.patch("/:dailyTaskId/tasks/:taskId/status",authMiddleware, ctrl.updateTaskStatus);
 router.delete("/:dailyTaskId/tasks/:taskId/delete",authMiddleware, ctrl.deleteTaskStatus);
 router.get("/summary/:id", ctrl.getTaskSummary);
 router.get("/:id",  ctrl.getDailyTaskById);

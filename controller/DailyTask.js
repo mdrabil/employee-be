@@ -296,57 +296,137 @@ export const addTaskForToday = async (req, res) => {
 //   }
 // };
 
+// export const updateTaskStatus = async (req, res) => {
+//   try {
+//     const { dailyTaskId, taskId } = req.params;
+//     const { status, endTime } = req.body;
+
+//     if (!["pending", "in-progress", "completed"].includes(status))
+//       return res.status(400).json({ success: false, message: "Invalid status" });
+
+//     const doc = await DailyTask.findById(dailyTaskId);
+//     if (!doc) return res.status(404).json({ success: false, message: "Daily task not found" });
+
+//     const task = doc.tasks.id(taskId);
+//     if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+
+//     const now = new Date();
+
+//     if (status === "in-progress") {
+//       // 🔹 Start this task
+//       doc.tasks.forEach(t => {
+//         if (t._id.equals(task._id)) {
+//           if (t.status !== "completed") t.status = "in-progress";
+//           if (!t.startTime) t.startTime = now;
+//           if (!t.lastStartedAt) {
+//             t.lastStartedAt = now;
+//             t.progressSessions.push({ start: now }); // new session start
+//           }
+//         } else if (t.status === "in-progress" && t.lastStartedAt) {
+//           // stop other in-progress tasks
+//           let lastSession = t.progressSessions[t.progressSessions.length - 1];
+//           if (lastSession && !lastSession.end) {
+//             lastSession.end = now;
+//           }
+//           t.lastStartedAt = null;
+//           if (t.status !== "completed") t.status = "pending";
+//         }
+//       });
+//     } 
+    
+//     else if (status === "completed") {
+//       if (task.status === "in-progress" && task.lastStartedAt) {
+//         // close current session
+//         let lastSession = task.progressSessions[task.progressSessions.length - 1];
+//         if (lastSession && !lastSession.end) {
+//           lastSession.end = now;
+//         }
+//         task.lastStartedAt = null;
+//       }
+//       task.status = "completed";
+//       task.endTime = endTime ? new Date(endTime) : now;
+
+//       // 🔹 Calculate total duration from sessions
+//       let totalHours = 0;
+//       task.progressSessions.forEach(s => {
+//         if (s.start && s.end) {
+//           const diff = (s.end - s.start) / (1000 * 60 * 60);
+//           totalHours += diff;
+//         }
+//       });
+//       task.durationHours = Math.round(totalHours * 100) / 100;
+//     } 
+    
+//     else if (status === "pending") {
+//       if (task.status === "in-progress" && task.lastStartedAt) {
+//         let lastSession = task.progressSessions[task.progressSessions.length - 1];
+//         if (lastSession && !lastSession.end) {
+//           lastSession.end = now;
+//         }
+//         task.lastStartedAt = null;
+//       }
+//       if (task.status !== "completed") task.status = "pending";
+//     }
+
+//     recalcSummary(doc);
+//     await doc.save();
+//     res.json({ success: true, data: doc });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(400).json({ success: false, message: err.message });
+//   }
+// };
+
+
+
 export const updateTaskStatus = async (req, res) => {
   try {
     const { dailyTaskId, taskId } = req.params;
     const { status, endTime } = req.body;
 
-    if (!["pending", "in-progress", "completed"].includes(status))
+    // ✅ Status validation
+    if (!["pending", "in-progress", "completed"].includes(status)) {
       return res.status(400).json({ success: false, message: "Invalid status" });
+    }
 
-    const doc = await DailyTask.findById(dailyTaskId);
-    if (!doc) return res.status(404).json({ success: false, message: "Daily task not found" });
+    // ✅ DailyTask find karo, aur employee check karo
+    const doc = await DailyTask.findOne({ _id: dailyTaskId, employee: req.user.id });
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Daily task not found for this employee" });
+    }
 
     const task = doc.tasks.id(taskId);
-    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+    if (!task) {
+      return res.status(404).json({ success: false, message: "Task not found" });
+    }
 
     const now = new Date();
 
     if (status === "in-progress") {
-      // 🔹 Start this task
-      doc.tasks.forEach(t => {
-        if (t._id.equals(task._id)) {
-          if (t.status !== "completed") t.status = "in-progress";
-          if (!t.startTime) t.startTime = now;
-          if (!t.lastStartedAt) {
-            t.lastStartedAt = now;
-            t.progressSessions.push({ start: now }); // new session start
-          }
-        } else if (t.status === "in-progress" && t.lastStartedAt) {
-          // stop other in-progress tasks
-          let lastSession = t.progressSessions[t.progressSessions.length - 1];
-          if (lastSession && !lastSession.end) {
-            lastSession.end = now;
-          }
-          t.lastStartedAt = null;
-          if (t.status !== "completed") t.status = "pending";
-        }
-      });
+      // 🔹 Multiple in-progress allowed
+      task.status = "in-progress";
+      if (!task.startTime) task.startTime = now;
+
+      if (!task.lastStartedAt) {
+        task.lastStartedAt = now;
+        task.progressSessions.push({ start: now });
+      }
     } 
     
     else if (status === "completed") {
-      if (task.status === "in-progress" && task.lastStartedAt) {
-        // close current session
+      // Agar in-progress tha → session close karo
+      if (task.lastStartedAt) {
         let lastSession = task.progressSessions[task.progressSessions.length - 1];
         if (lastSession && !lastSession.end) {
           lastSession.end = now;
         }
         task.lastStartedAt = null;
       }
+
       task.status = "completed";
       task.endTime = endTime ? new Date(endTime) : now;
 
-      // 🔹 Calculate total duration from sessions
+      // 🔹 Calculate total duration
       let totalHours = 0;
       task.progressSessions.forEach(s => {
         if (s.start && s.end) {
@@ -358,24 +438,27 @@ export const updateTaskStatus = async (req, res) => {
     } 
     
     else if (status === "pending") {
-      if (task.status === "in-progress" && task.lastStartedAt) {
+      // Agar in-progress tha → session close karo
+      if (task.lastStartedAt) {
         let lastSession = task.progressSessions[task.progressSessions.length - 1];
         if (lastSession && !lastSession.end) {
           lastSession.end = now;
         }
         task.lastStartedAt = null;
       }
-      if (task.status !== "completed") task.status = "pending";
+      task.status = "pending";  // ✅ restriction hata diya
     }
 
     recalcSummary(doc);
     await doc.save();
+
     res.json({ success: true, data: doc });
   } catch (err) {
     console.error(err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
+
 
 
 export const deleteTaskStatus = async (req, res) => {

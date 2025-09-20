@@ -12,8 +12,9 @@ import { Server } from "socket.io"; // ✅ move import to top
 import { ensureModules } from "./utils/autoCreateModule.js";
 import path from "path";
 import cron from "node-cron";
-import AttenanceModel from "./models/AttenanceModel.js";
+
 import { setupTaskReminderCron } from "./controller/DailyTask.js";
+import AttenanceModel from "./models/AttenanceModel.js";
 
 dotenv.config();
 const app = express();
@@ -45,9 +46,19 @@ app.use(
 );
 
 
-cron.schedule("30 22 * * *", async () => {
+// cron.schedule("30 22 * * *", async () => {
+//   await AttenanceModel.autoPunchOutToday();
+// });
+
+
+
+cron.schedule("01 22 * * *", async () => {
+  console.log("🚀 Running auto punch-out cron...");
   await AttenanceModel.autoPunchOutToday();
+}, {
+  timezone: "Asia/Kolkata"   // 🔹 Important for India time
 });
+
 // ✅ Connect DB
 connectDB();
 
