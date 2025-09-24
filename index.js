@@ -28,7 +28,8 @@ const allowedOrigins = [
   "http://localhost:5174",
   "http://localhost:3000",
   "https://crm.arawebtechnologies.com",
-  "http://crm.arawebtechnologies.com"
+  "http://crm.arawebtechnologies.com",
+  "https://mcr0j5fm-5173.inc1.devtunnels.ms"
 ];
 
 // ✅ CORS Middleware for Express
@@ -52,11 +53,11 @@ app.use(
 
 
 
+
+
 cron.schedule("01 22 * * *", async () => {
   console.log("🚀 Running auto punch-out cron...");
   await AttenanceModel.autoPunchOutToday();
-}, {
-  timezone: "Asia/Kolkata"   // 🔹 Important for India time
 });
 
 // ✅ Connect DB
@@ -94,6 +95,28 @@ io.on("connection", (socket) => {
     socket.join(userId); // ✅ unique room
     console.log("User connected:", userId);
   });
+
+
+
+ socket.on("join", (roomId) => {
+    socket.join(roomId);
+    console.log('room id',roomId)
+    socket.to(roomId).emit("user-joined", socket.id);
+  });
+
+  socket.on("offer", (data) => {
+    socket.to(data.roomId).emit("offer", data);
+  });
+
+  socket.on("answer", (data) => {
+    socket.to(data.roomId).emit("answer", data);
+  });
+
+  socket.on("ice-candidate", (data) => {
+    socket.to(data.roomId).emit("ice-candidate", data.candidate);
+  });
+
+
 
   socket.on("disconnect", () => {
     console.log("❌ Socket disconnected:", socket.id);

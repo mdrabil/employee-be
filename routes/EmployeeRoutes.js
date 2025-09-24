@@ -33,6 +33,18 @@ router.put("/:id",
    updateEmployee);
 router.delete("/:id", authMiddleware, checkPermission("employees", "canDelete"), deleteEmployee);
 
+
+router.post("/upload-screenshot", upload.single("screenshot"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  res.status(200).json({
+    ok: true,
+    file: { path: req.file.path.replace(/\\/g, "/") },
+  });
+});
+
+
 export default router;
+
 
 

@@ -179,17 +179,28 @@ export const addTaskForToday = async (req, res) => {
       messages: body.messages || "",
     };
 
-    const dateToUse = normalizeDate(body.date);
+    // const dateToUse = normalizeDate(body.date);
 
+    // let doc = await DailyTask.findOne({
+    //   employee: employeeId,
+    //   date: dateToUse,
+    // });
+
+        const today = new Date();
+    today.setHours(0, 0, 0, 0); // reset time to midnight
+
+    // 🔹 Find document for today
     let doc = await DailyTask.findOne({
       employee: employeeId,
-      date: dateToUse,
+      date: today,
     });
+
+
 
     if (!doc) {
       doc = new DailyTask({
         employee: employeeId,
-        date: dateToUse,
+        date: today,
         tasks: [task],
       });
     } else {
