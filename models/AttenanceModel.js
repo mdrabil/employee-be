@@ -218,24 +218,34 @@ attendanceSchema.pre("save", function (next) {
 // Static function
 attendanceSchema.statics.autoPunchOutToday = async function () {
   try {
+    // Aaj ka start & end
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Aaj ke attendances jinka checkout missing hai
     const pendingAttendances = await this.find({
-      checkIn: { $gte: todayStart },
+      checkIn: { $gte: todayStart, $lte: todayEnd },
       checkOut: null,
     });
 
     for (let attendance of pendingAttendances) {
+      // Fix checkout time = aaj ka 6:30 PM
       const autoCheckOut = new Date();
-      autoCheckOut.setHours(18, 30, 0, 0); // 6:30 PM
+      autoCheckOut.setHours(18, 30, 0, 0);
 
       const workMinutes = (autoCheckOut - attendance.checkIn) / (1000 * 60);
 
       let breakMinutes = 0;
-      attendance.breaks.forEach(b => {
-        if (b.start && b.end) breakMinutes += (b.end - b.start) / (1000 * 60);
-      });
+      if (attendance.breaks && attendance.breaks.length > 0) {
+        attendance.breaks.forEach(b => {
+          if (b.start && b.end) {
+            breakMinutes += (b.end - b.start) / (1000 * 60);
+          }
+        });
+      }
 
       const netMinutes = workMinutes - breakMinutes;
       const netHours = netMinutes / 60;
@@ -247,16 +257,76 @@ attendanceSchema.statics.autoPunchOutToday = async function () {
 
       const requiredMinutes = 8 * 60;
       let extraMinutes = 0;
-      if (netMinutes > requiredMinutes) extraMinutes = netMinutes - requiredMinutes;
+      if (netMinutes > requiredMinutes) {
+        extraMinutes = netMinutes - requiredMinutes;
+      }
       attendance.extraHours = parseFloat((extraMinutes / 60).toFixed(2));
 
       await attendance.save();
     }
 
-    console.log("✅ Auto punch-out applied for today");
+    console.log("✅ Auto punch-out applied for today (6:30 PM)");
   } catch (err) {
     console.error("❌ Error in auto punch-out:", err.message);
   }
 };
+
+// yestarday wala hai 
+// attendanceSchema.statics.autoPunchOutYesterday = async function () {
+//   try {
+//     // 🔹 Kal ka start aur end time
+//     const yesterday = new Date();
+//     yesterday.setDate(yesterday.getDate() - 1);
+//     yesterday.setHours(0, 0, 0, 0);
+
+//     const yesterdayEnd = new Date(yesterday);
+//     yesterdayEnd.setHours(23, 59, 59, 999);
+
+//     // 🔹 Kal ke attendances jinka checkout missing hai
+//     const pendingAttendances = await this.find({
+//       checkIn: { $gte: yesterday, $lte: yesterdayEnd },
+//       checkOut: null,
+//     });
+
+//     for (let attendance of pendingAttendances) {
+//       // Kal ka fixed checkout (6:30 PM)
+//       const autoCheckOut = new Date(yesterday);
+//       autoCheckOut.setHours(18, 30, 0, 0);
+
+//       const workMinutes = (autoCheckOut - attendance.checkIn) / (1000 * 60);
+
+//       let breakMinutes = 0;
+//       if (attendance.breaks && attendance.breaks.length > 0) {
+//         attendance.breaks.forEach(b => {
+//           if (b.start && b.end) {
+//             breakMinutes += (b.end - b.start) / (1000 * 60);
+//           }
+//         });
+//       }
+
+//       const netMinutes = workMinutes - breakMinutes;
+//       const netHours = netMinutes / 60;
+
+//       attendance.checkOut = autoCheckOut;
+//       attendance.currentStatus = "Completed";
+//       attendance.totalHours = parseFloat(netHours.toFixed(2));
+//       attendance.totalBreakTime = Math.round(breakMinutes);
+
+//       const requiredMinutes = 8 * 60;
+//       let extraMinutes = 0;
+//       if (netMinutes > requiredMinutes) {
+//         extraMinutes = netMinutes - requiredMinutes;
+//       }
+//       attendance.extraHours = parseFloat((extraMinutes / 60).toFixed(2));
+
+//       await attendance.save();
+//     }
+
+//     console.log("✅ Auto punch-out applied for yesterday (6:30 PM)");
+//   } catch (err) {
+//     console.error("❌ Error in auto punch-out:", err.message);
+//   }
+// };
+
 
 export default mongoose.model("Attendance", attendanceSchema);

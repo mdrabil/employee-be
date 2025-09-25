@@ -55,11 +55,16 @@ app.use(
 
 
 
-cron.schedule("01 22 * * *", async () => {
+cron.schedule("30 21 * * *", async () => {
   console.log("🚀 Running auto punch-out cron...");
   await AttenanceModel.autoPunchOutToday();
 });
 
+
+// cron.schedule("26 09 * * *", async () => {
+//   console.log("🚀 Running auto punch-out cron...");
+//   await AttenanceModel.autoPunchOutYesterday();
+// });
 // ✅ Connect DB
 connectDB();
 
